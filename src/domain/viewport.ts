@@ -120,3 +120,16 @@ export function gridStepM(spanM: number): number {
   const steps = [1, 2, 5, 10, 20, 50, 100, 200, 500]
   return steps.find((step) => spanM / step <= 15) ?? 1000
 }
+
+/**
+ * Глубины линий сетки внутри вида.
+ *
+ * @param view - текущий вид.
+ * @returns кратные шагу gridStepM глубины от topM до topM + spanM, м.
+ */
+export function gridDepths(view: ViewState): number[] {
+  const step = gridStepM(view.spanM)
+  const result: number[] = []
+  for (let k = Math.ceil(view.topM / step); k * step <= view.topM + view.spanM; k++) result.push(k * step)
+  return result
+}

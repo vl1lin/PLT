@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   clampView,
   depthToPx,
+  gridDepths,
   gridStepM,
   panBy,
   pxToDepth,
@@ -49,5 +50,9 @@ describe('масштаб', () => {
     expect(gridStepM(250)).toBe(20)
     expect(gridStepM(100)).toBe(10)
     expect(gridStepM(10)).toBe(1)
+  })
+  it('линии сетки внутри вида', () => {
+    expect(gridDepths({ topM: 3285, spanM: 40 })).toEqual([3285, 3290, 3295, 3300, 3305, 3310, 3315, 3320, 3325])
+    expect(gridDepths({ topM: 3285, spanM: 100 })).toHaveLength(10)
   })
 })

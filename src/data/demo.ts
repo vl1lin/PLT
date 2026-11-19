@@ -44,6 +44,7 @@ export function buildDemoCurves(): Curve[] {
     id,
     name: g.name,
     unit: g.unit,
+    source: 'демо',
     depthM,
     values: depthM.map(g.f),
   }))
@@ -73,9 +74,9 @@ export function buildDemoProject(): Project {
       { id: 'w5', title: 'БМ_фнт', visible: true, curves: [{ curveId: 'bm', color: '#DB2777', scaleMin: 90, scaleMax: 230, visible: true }] },
     ],
     groups: [
-      { id: 'g1', name: 'Перфорация', color: '#D97706', visible: true },
-      { id: 'g2', name: 'Работающие интервалы', color: '#2563EB', visible: true },
-      { id: 'g3', name: 'Заколонные перетоки', color: '#9333EA', visible: true },
+      { id: 'g1', name: 'Перфорация', color: '#D97706', visible: true, showInWellbore: true },
+      { id: 'g2', name: 'Работающие интервалы', color: '#2563EB', visible: true, showInWellbore: false },
+      { id: 'g3', name: 'Заколонные перетоки', color: '#9333EA', visible: true, showInWellbore: false },
     ],
     intervals: [
       { id: 'i1', groupId: 'g1', topM: 3352, baseM: 3372, windowIds: 'all' },

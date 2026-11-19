@@ -31,6 +31,8 @@ export interface Curve {
   readonly name: string
   /** Единица измерения значений (например, «°C», «атм»). */
   readonly unit: string
+  /** Имя файла, из которого загружена кривая. */
+  readonly source: string
   /** Глубины по стволу, м (MD), строго по возрастанию. */
   readonly depthM: Float64Array
   /** Значения кривой, той же длины, что depthM. */
@@ -66,6 +68,8 @@ export const IntervalGroupSchema = z.object({
   name: z.string().min(1),
   color: hexColor,
   visible: z.boolean(),
+  /** Показывать интервалы группы штриховкой в колонке «Ствол» (перфорация). */
+  showInWellbore: z.boolean(),
 })
 export type IntervalGroup = z.infer<typeof IntervalGroupSchema>
 
