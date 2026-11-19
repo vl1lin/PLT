@@ -8,12 +8,16 @@
 import { useState, type DragEvent } from 'react'
 import type { TrackWindow } from '../domain/model'
 import { useAppStore } from '../state/store'
+import { addWindow } from '../domain/windows'
 import { DepthScale, Navigator, Wellbore } from './DepthColumns'
+import { Icon } from './icons'
 import { importLasFiles } from './importLas'
+import { TrackHeader } from './TrackHeader'
 import { TrackPlot } from './TrackPlot'
 
 export function Workspace() {
   const windows = useAppStore((s) => s.project.windows)
+  const updateProject = useAppStore((s) => s.updateProject)
   const [dragOver, setDragOver] = useState(false)
   const visible = windows.filter((w) => w.visible)
 
@@ -41,7 +45,14 @@ export function Workspace() {
       {visible.map((w) => (
         <TrackColumn key={w.id} window={w} number={windows.indexOf(w) + 1} />
       ))}
-      {visible.length === 0 && <div className="workspace__empty">Нет видимых окон</div>}
+      {visible.length === 0 && (
+        <div className="workspace__empty">
+          <span>Нет видимых окон</span>
+          <button type="button" className="btn" onClick={() => updateProject((p) => addWindow(p).project)}>
+            <Icon name="plus" /> Создать окно
+          </button>
+        </div>
+      )}
       {dragOver && <div className="workspace__dropzone">Отпустите LAS-файлы для загрузки</div>}
     </div>
   )
@@ -49,27 +60,9 @@ export function Workspace() {
 
 /** Одно окно: шапка с легендой и область построения. */
 function TrackColumn({ window, number }: { window: TrackWindow; number: number }) {
-  const curves = useAppStore((s) => s.curves)
   return (
     <section className="column track" aria-label={`Окно ${number}: ${window.title}`}>
-      <header className="column__header track__header">
-        <div className="track__title">
-          <span className="mono muted">{number}</span>
-          <span className="track__name">{window.title}</span>
-        </div>
-        {window.curves.map((c) => {
-          const curve = curves.get(c.curveId)
-          return (
-            <div key={c.curveId} className="track__curve">
-              <span className="track__swatch" style={{ background: c.color }} />
-              <span className="track__curve-name">{curve?.name ?? '—'}</span>
-              <span className="mono muted track__range">
-                {c.scaleMin}–{c.scaleMax} {curve?.unit ?? ''}
-              </span>
-            </div>
-          )
-        })}
-      </header>
+      <TrackHeader window={window} number={number} />
       <TrackPlot window={window} />
     </section>
   )

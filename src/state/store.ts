@@ -16,6 +16,7 @@ import { buildDemoCurves, buildDemoProject } from '../data/demo'
 import { depthLimits, mergeCurves, windowsForCurves } from '../domain/dataset'
 import type { Curve, Project, ViewState } from '../domain/model'
 import { clampView, panBy, spanForScale, zoomAt, type DepthLimits } from '../domain/viewport'
+import { removeWindow, restoreWindow } from '../domain/windows'
 
 /** Активный инструмент панели инструментов. */
 export type Tool = 'pointer' | 'zoom' | 'interval' | 'line' | 'fill'
@@ -26,10 +27,11 @@ export interface WellInfo {
   readonly field: string
 }
 
-/** Сообщение в строке состояния. */
+/** Сообщение в строке состояния; action — кнопка рядом (например, «Вернуть»). */
 export interface Message {
   readonly kind: 'info' | 'error'
   readonly text: string
+  readonly action?: { readonly label: string; readonly run: () => void }
 }
 
 const HISTORY_LIMIT = 30
@@ -53,6 +55,8 @@ export interface AppState {
   tool: Tool
   /** Сообщение для строки состояния. */
   message: Message | null
+  /** Открыта ли правая панель. */
+  panelOpen: boolean
 
   /** Устанавливает вид; remember — запомнить текущий для «Предыдущий вид». */
   setView: (view: ViewState, remember?: boolean) => void
@@ -76,6 +80,12 @@ export interface AppState {
   addLasDataset: (result: LasParseResult, fileName: string) => void
   /** Показывает сообщение (null — убрать). */
   setMessage: (message: Message | null) => void
+  /** Применяет чистую функцию domain/* к проекту. */
+  updateProject: (fn: (p: Project) => Project) => void
+  /** Удаляет окно с возможностью вернуть из строки состояния. */
+  deleteWindow: (windowId: string) => void
+  /** Открывает/закрывает правую панель. */
+  togglePanel: () => void
 }
 
 const demoCurves = buildDemoCurves()
@@ -100,6 +110,7 @@ export const useAppStore = create<AppState>()((set, get) => {
     plotHeightPx: 780,
     tool: 'pointer',
     message: null,
+    panelOpen: true,
 
     setView: (view, remember = false) => set((s) => withView(s, view, remember)),
     rememberView: () => set((s) => ({ history: [...s.history, s.project.view].slice(-HISTORY_LIMIT) })),
@@ -147,5 +158,22 @@ export const useAppStore = create<AppState>()((set, get) => {
         }
       }),
     setMessage: (message) => set({ message }),
+    updateProject: (fn) => set((s) => ({ project: fn(s.project) })),
+    deleteWindow: (windowId) => {
+      const { project, removed } = removeWindow(get().project, windowId)
+      if (!removed) return
+      set({
+        project,
+        message: {
+          kind: 'info',
+          text: `Окно «${removed.window.title}» удалено.`,
+          action: {
+            label: 'Вернуть',
+            run: () => set((s) => ({ project: restoreWindow(s.project, removed), message: null })),
+          },
+        },
+      })
+    },
+    togglePanel: () => set((s) => ({ panelOpen: !s.panelOpen })),
   }
 })

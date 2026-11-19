@@ -22,6 +22,11 @@ export function StatusBar() {
       {message ? (
         <>
           <span className={message.kind === 'error' ? 'statusbar__text statusbar__text--error' : 'statusbar__text'}>{message.text}</span>
+          {message.action && (
+            <button type="button" className="btn btn--small-text" onClick={message.action.run}>
+              {message.action.label}
+            </button>
+          )}
           <button type="button" className="btn btn--icon btn--small" aria-label="Скрыть сообщение" onClick={() => setMessage(null)}>
             <Icon name="close" size={12} />
           </button>

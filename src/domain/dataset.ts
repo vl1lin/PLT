@@ -5,7 +5,7 @@
  *                                            └─windowsForCurves()──→ TrackWindow[]
  *        Curve[] ──depthLimits()──→ DepthLimits (для viewport)
  */
-import type { Curve, TrackWindow } from './model'
+import type { Curve, CurveDisplay, TrackWindow } from './model'
 import { niceRange } from './scale'
 import type { DepthLimits } from './viewport'
 
@@ -48,6 +48,24 @@ export function mergeCurves(existing: Iterable<Curve>, incoming: readonly Parsed
 }
 
 /**
+ * Отображение кривой по умолчанию: автошкала и цвет из палитры.
+ *
+ * @param curve - кривая.
+ * @param colorIndex - номер цвета в палитре (берётся по модулю).
+ * @returns видимое отображение кривой.
+ */
+export function defaultDisplay(curve: Curve, colorIndex: number): CurveDisplay {
+  const range = niceRange(curve.values)
+  return {
+    curveId: curve.id,
+    color: CURVE_PALETTE[colorIndex % CURVE_PALETTE.length] ?? '#1A1D23',
+    scaleMin: range.min,
+    scaleMax: range.max,
+    visible: true,
+  }
+}
+
+/**
  * Окно на каждую кривую с автошкалой и цветом из палитры.
  *
  * @param curves - кривые, для которых нужны окна.
@@ -55,23 +73,12 @@ export function mergeCurves(existing: Iterable<Curve>, incoming: readonly Parsed
  * @returns окна, по одному на кривую.
  */
 export function windowsForCurves(curves: readonly Curve[], colorOffset = 0): TrackWindow[] {
-  return curves.map((c, i) => {
-    const range = niceRange(c.values)
-    return {
-      id: newId('w'),
-      title: c.name,
-      visible: true,
-      curves: [
-        {
-          curveId: c.id,
-          color: CURVE_PALETTE[(colorOffset + i) % CURVE_PALETTE.length] ?? '#1A1D23',
-          scaleMin: range.min,
-          scaleMax: range.max,
-          visible: true,
-        },
-      ],
-    }
-  })
+  return curves.map((c, i) => ({
+    id: newId('w'),
+    title: c.name,
+    visible: true,
+    curves: [defaultDisplay(c, colorOffset + i)],
+  }))
 }
 
 /**

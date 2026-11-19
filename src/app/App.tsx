@@ -7,6 +7,7 @@
  *        ├─ Workspace   (навигатор, шкала MD, ствол, окна с кривыми) + StatusBar
  *        └─ SidePanel   (группы, интервалы, сводка, комментарии)
  */
+import { useAppStore } from '../state/store'
 import { SidePanel } from '../ui/SidePanel'
 import { StatusBar } from '../ui/StatusBar'
 import { Toolbar } from '../ui/Toolbar'
@@ -14,6 +15,7 @@ import { TopBar } from '../ui/TopBar'
 import { Workspace } from '../ui/Workspace'
 
 export function App() {
+  const panelOpen = useAppStore((s) => s.panelOpen)
   return (
     <div className="app">
       <TopBar />
@@ -23,7 +25,7 @@ export function App() {
           <Workspace />
           <StatusBar />
         </main>
-        <SidePanel />
+        {panelOpen && <SidePanel />}
       </div>
     </div>
   )
