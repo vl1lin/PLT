@@ -8,10 +8,12 @@
  *   SummaryCard   → intervalSummary() (только видимые кривые окон интервала),
  *                   updateInterval (кровля, подошва, группа), комментарии, удаление
  *   DrawingCard   → пунктир / удаление линии, удаление заливки
+ *   ConstructionCard → конструкция скважины из ~P LAS (только просмотр)
  */
 import { useState } from 'react'
 import { addGroup, addComment, deleteComment, deleteGroup, intervalSummary, updateGroup, updateInterval } from '../domain/intervals'
 import type { Interval } from '../domain/model'
+import { describeString } from '../domain/construction'
 import { updateLine } from '../domain/drawings'
 import { useAppStore } from '../state/store'
 import { Icon } from './icons'
@@ -23,6 +25,7 @@ export function SidePanel() {
       <GroupsCard />
       <IntervalsCard />
       {selection?.kind === 'line' || selection?.kind === 'fill' ? <DrawingCard /> : <SummaryCard />}
+      <ConstructionCard />
     </aside>
   )
 }
@@ -387,6 +390,29 @@ function DrawingCard() {
           Снять выбор
         </button>
       </div>
+    </section>
+  )
+}
+
+function ConstructionCard() {
+  const construction = useAppStore((s) => s.construction)
+  if (!construction) return null
+  return (
+    <section className="card">
+      <h2 className="card__title">Конструкция</h2>
+      {construction.strings.map((s) => (
+        <p key={s.code} className="card__line">
+          {describeString(s)}
+        </p>
+      ))}
+      {construction.openHole.map((o) => (
+        <p key={o.topM} className="card__line">
+          Открытый ствол, {o.topM.toFixed(1)}–{o.baseM.toFixed(1)} м
+        </p>
+      ))}
+      {construction.currentBottomM !== null && (
+        <p className="card__line">Текущий забой {construction.currentBottomM.toFixed(1)} м</p>
+      )}
     </section>
   )
 }

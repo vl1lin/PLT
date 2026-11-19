@@ -13,7 +13,8 @@
 import { create } from 'zustand'
 import type { LasParseResult } from '../data/las'
 import type { ProjectBundle } from '../data/projectFile'
-import { buildDemoCurves, buildDemoProject } from '../data/demo'
+import { buildDemoConstruction, buildDemoCurves, buildDemoProject } from '../data/demo'
+import { constructionFromParameters, type WellConstruction } from '../domain/construction'
 import { depthLimits, initialView, mergeCurves, windowsForCurves } from '../domain/dataset'
 import type { Curve, Project, ViewState } from '../domain/model'
 import { clampView, panBy, spanForScale, zoomAt, type DepthLimits } from '../domain/viewport'
@@ -63,6 +64,8 @@ export interface AppState {
   curves: ReadonlyMap<string, Curve>
   /** Скважина (из первого загруженного LAS). */
   well: WellInfo | null
+  /** Конструкция скважины (из ~P первого LAS, где она есть). */
+  construction: WellConstruction | null
   /** true, пока показаны демо-данные; первый импорт их заменяет. */
   isDemo: boolean
   /** Пределы глубин данных и ограничения масштаба. */
@@ -149,6 +152,7 @@ export const useAppStore = create<AppState>()((set, get) => {
   return {
     curves: new Map(demoCurves.map((c) => [c.id, c])),
     well: null,
+    construction: buildDemoConstruction(),
     isDemo: true,
     limits: demoLimits,
     project: buildDemoProject(),
@@ -198,10 +202,13 @@ export const useAppStore = create<AppState>()((set, get) => {
         const view = s.isDemo ? firstView : baseProject.view
         // Без названия скважины в файле — имя файла без расширения.
         const well = s.well ?? { name: result.well.name || fileName.replace(/\.[^.]+$/, ''), field: result.well.field }
+        const baseConstruction = s.isDemo ? null : s.construction
+        const construction = baseConstruction ?? constructionFromParameters(result.parameters)
         const notes = result.warnings.length ? ` Замечания: ${result.warnings.join('; ')}` : ''
         return {
           curves: new Map(allCurves.map((c) => [c.id, c])),
           well,
+          construction,
           isDemo: false,
           limits,
           project: { ...baseProject, windows, view: clampView(view, limits) },
@@ -312,6 +319,7 @@ export const useAppStore = create<AppState>()((set, get) => {
       set({
         curves: new Map(bundle.curves.map((c) => [c.id, c])),
         well: bundle.well,
+        construction: bundle.construction,
         isDemo: false,
         limits,
         project: { ...bundle.project, view: clampView(bundle.project.view, limits) },

@@ -20,10 +20,20 @@ export interface LasWellInfo {
   readonly date: string
 }
 
+/** Параметр из секции ~P как есть (интерпретация — domain/construction). */
+export interface LasParameter {
+  readonly mnemonic: string
+  readonly unit: string
+  readonly value: string
+  readonly description: string
+}
+
 /** Результат разбора файла. */
 export interface LasParseResult {
   readonly well: LasWellInfo
   readonly curves: ParsedCurve[]
+  /** Параметры секции ~P (конструкция скважины и т. п.). */
+  readonly parameters: LasParameter[]
   /** Некритичные замечания (обрезанные строки и т. п.). */
   readonly warnings: string[]
 }
@@ -130,6 +140,7 @@ export function parseLas(text: string): LasParseResult {
   const version: Map<string, HeaderLine> = new Map()
   const well: Map<string, HeaderLine> = new Map()
   const curveDefs: HeaderLine[] = []
+  const parameters: HeaderLine[] = []
   const dataTokens: string[] = []
   let section = ''
 
@@ -150,6 +161,7 @@ export function parseLas(text: string): LasParseResult {
     if (section === 'V') version.set(key, header)
     else if (section === 'W') well.set(key, header)
     else if (section === 'C') curveDefs.push(header)
+    else if (section === 'P') parameters.push(header)
   }
 
   const vers = version.get('VERS')?.value ?? ''
@@ -209,6 +221,7 @@ export function parseLas(text: string): LasParseResult {
   return {
     well: { name: wellText('WELL'), field: wellText('FLD'), company: wellText('COMP'), date: wellText('DATE') },
     curves,
+    parameters,
     warnings,
   }
 }

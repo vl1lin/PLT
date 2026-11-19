@@ -5,7 +5,7 @@
  *        Curve[] ──dataExtent()──→ участок с замерами каждой кривой
  *                ──depthLimits()──→ DepthLimits (навигация по всем данным)
  *                ──initialView()──→ ViewState (участок, где есть данные у большинства кривых)
- *                ──windowsForCurves()──→ TrackWindow[] (окно на семейство кривых, общая шкала)
+ *                ──windowsForCurves()──→ TrackWindow[] (окно на семейство кривых, свои шкалы)
  *
  * Семейство кривых: одинаковая единица и первая буква мнемоники (TFNT, TO, TTFNT в °C —
  * термометрия; DBFNT и VGFNT в кГц — разные приборы, разные окна).
@@ -129,33 +129,25 @@ export function curveFamily(curve: Curve): string {
   return `${curve.unit.toLowerCase()}|${curve.name.charAt(0).toUpperCase()}`
 }
 
-/** Значения кривой в пределах участка (все значения, если на участке замеров нет). */
-function focusValues(c: Curve, focus: ViewState | null): number[] {
-  const i0 = focus ? lowerBound(c.depthM, focus.topM) : 0
-  const i1 = focus ? lowerBound(c.depthM, focus.topM + focus.spanM) : c.depthM.length
-  const vs = Array.from(c.values.subarray(i0, i1))
-  return vs.some(Number.isFinite) ? vs : Array.from(c.values)
-}
-
 /**
- * Общая шкала для кривых окна, если их диапазоны сопоставимы (каждый не уже четверти
- * общего); иначе каждая кривая сохраняет свою шкалу (например, ГК в API и в имп/мин).
+ * Шкала кривой по значениям на участке глубин.
  *
- * @param ranges - собственные шкалы кривых.
- * @returns шкала для каждой кривой.
+ * @param curve - кривая.
+ * @param focus - участок (обычно видимый); null — все данные. Если на участке нет
+ *                замеров, берутся все данные.
+ * @returns круглые границы шкалы.
  */
-export function shareScale(ranges: readonly ScaleRange[]): ScaleRange[] {
-  if (ranges.length < 2) return [...ranges]
-  const min = Math.min(...ranges.map((r) => r.min))
-  const max = Math.max(...ranges.map((r) => r.max))
-  const comparable = ranges.every((r) => r.max - r.min >= 0.25 * (max - min))
-  return comparable ? ranges.map(() => ({ min, max })) : [...ranges]
+export function curveRangeIn(curve: Curve, focus: ViewState | null): ScaleRange {
+  const i0 = focus ? lowerBound(curve.depthM, focus.topM) : 0
+  const i1 = focus ? lowerBound(curve.depthM, focus.topM + focus.spanM) : curve.depthM.length
+  const part = curve.values.subarray(i0, i1)
+  return niceRange(part.some(Number.isFinite) ? part : curve.values)
 }
 
 /**
  * Окна для новых кривых: по одному на семейство, в порядке появления в файле.
- * Шкалы — по значениям в пределах focus (если задан); у сопоставимых кривых шкала
- * общая (фон и режимы видно на одной шкале); цвета внутри окна различаются.
+ * У каждой кривой своя шкала по значениям в пределах focus (если задан); общую шкалу
+ * окна пользователь задаёт сам (domain/windows: setWindowScale). Цвета внутри окна различаются.
  *
  * @param curves - кривые, для которых нужны окна.
  * @param focus - участок глубин для автошкалы (обычно начальный вид); null — все данные.
@@ -168,8 +160,7 @@ export function windowsForCurves(curves: readonly Curve[], focus: ViewState | nu
     families.set(key, [...(families.get(key) ?? []), c])
   }
   return Array.from(families.values(), (members) => {
-    const own = members.map((c) => niceRange(focusValues(c, focus)))
-    const ranges = shareScale(own)
+    const ranges = members.map((c) => curveRangeIn(c, focus))
     const names = Array.from(new Set(members.map((c) => c.name.replace(/_\d+$/, ''))))
     return {
       id: newId('w'),

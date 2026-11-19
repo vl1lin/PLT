@@ -6,9 +6,12 @@
  *
  *   addWindow / renameWindow / setWindowVisible / moveWindow / removeWindow ⇄ restoreWindow
  *   addCurveDisplay / removeCurveDisplay / updateCurveDisplay
+ *   шкалы окна: unionOfScales → setWindowScale (общая); autoScaleWindow (по видимому участку,
+ *   общая или свои)
  */
-import { newId } from './dataset'
-import type { CurveDisplay, Project, TrackWindow } from './model'
+import { curveRangeIn, newId } from './dataset'
+import type { Curve, CurveDisplay, Project, TrackWindow, ViewState } from './model'
+import { niceRange, type ScaleRange } from './scale'
 
 /** Удалённое окно и его позиция — для «Вернуть». */
 export interface RemovedWindow {
@@ -164,4 +167,68 @@ export function updateCurveDisplay(
  */
 export function findCurveDisplay(p: Project, windowId: string, curveId: string): CurveDisplay | undefined {
   return p.windows.find((w) => w.id === windowId)?.curves.find((c) => c.curveId === curveId)
+}
+
+/**
+ * Охватывающая шкала текущих шкал кривых окна.
+ *
+ * @param w - окно.
+ * @returns от наименьшего минимума до наибольшего максимума или null для пустого окна.
+ */
+export function unionOfScales(w: TrackWindow): ScaleRange | null {
+  if (w.curves.length === 0) return null
+  const lo = Math.min(...w.curves.map((c) => Math.min(c.scaleMin, c.scaleMax)))
+  const hi = Math.max(...w.curves.map((c) => Math.max(c.scaleMin, c.scaleMax)))
+  return { min: lo, max: hi }
+}
+
+/**
+ * Задаёт одну шкалу всем кривым окна.
+ *
+ * @param p - проект.
+ * @param windowId - окно.
+ * @param range - шкала (min ≠ max; min > max — обратная шкала).
+ * @returns новый проект (без изменений при min = max).
+ */
+export function setWindowScale(p: Project, windowId: string, range: ScaleRange): Project {
+  if (range.min === range.max) return p
+  return mapWindow(p, windowId, (w) => ({
+    ...w,
+    curves: w.curves.map((c) => ({ ...c, scaleMin: range.min, scaleMax: range.max })),
+  }))
+}
+
+/**
+ * Автошкалы кривых окна по значениям на участке глубин.
+ *
+ * @param p - проект.
+ * @param windowId - окно.
+ * @param curves - данные кривых по id.
+ * @param focus - участок (обычно видимый).
+ * @param shared - true: одна шкала на все кривые окна; false: у каждой своя.
+ * @returns новый проект.
+ */
+export function autoScaleWindow(
+  p: Project,
+  windowId: string,
+  curves: ReadonlyMap<string, Curve>,
+  focus: ViewState,
+  shared: boolean,
+): Project {
+  return mapWindow(p, windowId, (w) => {
+    const ranges = new Map<string, ScaleRange>()
+    for (const d of w.curves) {
+      const c = curves.get(d.curveId)
+      if (c) ranges.set(d.curveId, curveRangeIn(c, focus))
+    }
+    const all = Array.from(ranges.values())
+    const common = all.length ? niceRange(all.flatMap((r) => [r.min, r.max])) : null
+    return {
+      ...w,
+      curves: w.curves.map((d) => {
+        const r = shared ? common : ranges.get(d.curveId)
+        return r ? { ...d, scaleMin: r.min, scaleMax: r.max } : d
+      }),
+    }
+  })
 }

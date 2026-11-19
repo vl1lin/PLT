@@ -38,8 +38,8 @@ function fileNameFor(wellName: string | undefined): string {
 
 /** Скачивает проект (кривые + разметку) одним файлом. */
 export function saveProjectFile(): void {
-  const { well, curves, project, setMessage } = useAppStore.getState()
-  const text = serializeProject({ well, curves: Array.from(curves.values()), project }, new Date())
+  const { well, construction, curves, project, setMessage } = useAppStore.getState()
+  const text = serializeProject({ well, construction, curves: Array.from(curves.values()), project }, new Date())
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
   const a = document.createElement('a')
   a.href = url

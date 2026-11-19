@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { buildDemoProject } from '../data/demo'
+import { buildDemoCurves, buildDemoProject } from '../data/demo'
 import {
   addCurveDisplay,
   addWindow,
   moveWindow,
   removeCurveDisplay,
+  autoScaleWindow,
   removeWindow,
   renameWindow,
   restoreWindow,
+  setWindowScale,
+  unionOfScales,
   updateCurveDisplay,
 } from './windows'
 
@@ -42,5 +45,31 @@ describe('кривые в окне', () => {
     const hidden = updateCurveDisplay(p, 'w3', 'gk', { visible: false, scaleMax: 20 })
     expect(hidden.windows[2]?.curves[1]).toMatchObject({ visible: false, scaleMax: 20 })
     expect(removeCurveDisplay(hidden, 'w3', 'gk').windows[2]?.curves).toHaveLength(1)
+  })
+})
+
+describe('шкалы окна', () => {
+  const curves = new Map(buildDemoCurves().map((c) => [c.id, c]))
+  const view = { topM: 3300, spanM: 100 }
+
+  it('общая шкала по текущим и вручную', () => {
+    let p = updateCurveDisplay(buildDemoProject(), 'w2', 'tm0', { scaleMin: 100, scaleMax: 104 })
+    const w = p.windows.find((x) => x.id === 'w2')
+    if (!w) throw new Error('нет окна')
+    expect(unionOfScales(w)).toEqual({ min: 100, max: 105.5 })
+    p = setWindowScale(p, 'w2', { min: 101, max: 106 })
+    expect(p.windows[1]?.curves.map((c) => [c.scaleMin, c.scaleMax])).toEqual([
+      [101, 106],
+      [101, 106],
+    ])
+    expect(setWindowScale(p, 'w2', { min: 1, max: 1 })).toBe(p)
+  })
+
+  it('автошкалы по видимому участку: общая и свои', () => {
+    const shared = autoScaleWindow(buildDemoProject(), 'w2', curves, view, true).windows[1]?.curves ?? []
+    expect(shared[0]?.scaleMin).toBe(shared[1]?.scaleMin)
+    expect(shared[0]?.scaleMax).toBe(shared[1]?.scaleMax)
+    const own = autoScaleWindow(buildDemoProject(), 'w2', curves, view, false).windows[1]?.curves ?? []
+    expect(own[0]?.scaleMax).toBeLessThan(105)
   })
 })

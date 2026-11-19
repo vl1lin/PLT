@@ -2,11 +2,13 @@
  * Демонстрационный набор данных: синтетические кривые и разметка из концепта.
  *
  * Схема: buildDemoCurves() → Curve[]  ┐
- *        buildDemoProject() → Project ┴→ store (начальное состояние)
+ *        buildDemoProject() → Project ┼→ store (начальное состояние)
+ *        buildDemoConstruction()      ┘
  *
  * Используется, пока не реализована загрузка LAS/CSV. Значения не являются
  * реальными замерами.
  */
+import type { WellConstruction } from '../domain/construction'
 import type { Curve, Project } from '../domain/model'
 
 /** Диапазон глубин демо-данных, м. */
@@ -88,5 +90,21 @@ export function buildDemoProject(): Project {
     lines: [],
     fills: [],
     view: { topM: DEMO_DEPTH.minM, spanM: DEMO_DEPTH.maxM - DEMO_DEPTH.minM },
+  }
+}
+
+/**
+ * Конструкция демо-скважины: колонна, хвостовик, текущий забой.
+ *
+ * @returns конструкция для колонки «Ствол».
+ */
+export function buildDemoConstruction(): WellConstruction {
+  return {
+    strings: [
+      { code: 'CP1', label: 'Колонна', topM: 0, baseM: 3320, outerDiameterMm: 168, innerDiameterMm: 150 },
+      { code: 'CH1', label: 'Хвостовик', topM: 3260, baseM: 3530, outerDiameterMm: 114, innerDiameterMm: null },
+    ],
+    openHole: [],
+    currentBottomM: 3515,
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dataExtent, depthLimits, initialView, mergeCurves, shareScale, windowsForCurves, type ParsedCurve } from './dataset'
+import { curveRangeIn, dataExtent, depthLimits, initialView, mergeCurves, windowsForCurves, type ParsedCurve } from './dataset'
 import type { Curve } from './model'
 
 const parsed = (name: string, depths: number[]): ParsedCurve => ({
@@ -28,7 +28,7 @@ const curve = (name: string, unit: string, depths: number[], values: number[]): 
 const GAP = Number.NaN
 
 describe('windowsForCurves', () => {
-  it('одно окно на семейство с общей шкалой', () => {
+  it('одно окно на семейство, у кривых свои шкалы', () => {
     const curves = mergeCurves(
       [],
       [
@@ -44,7 +44,7 @@ describe('windowsForCurves', () => {
     expect(ws.map((w) => w.title)).toEqual(['TFNT, TO', 'DBFNT', 'VGFNT'])
     const t = ws[0]?.curves ?? []
     expect(t).toHaveLength(3)
-    expect(new Set(t.map((d) => `${d.scaleMin}-${d.scaleMax}`)).size).toBe(1)
+    expect(t[0]?.scaleMax).not.toBe(t[2]?.scaleMax)
     expect(new Set(t.map((d) => d.color)).size).toBe(3)
   })
   it('шкала по участку focus', () => {
@@ -54,14 +54,12 @@ describe('windowsForCurves', () => {
   })
 })
 
-describe('shareScale', () => {
-  it('общая шкала только для сопоставимых диапазонов', () => {
-    expect(shareScale([{ min: 78, max: 82 }, { min: 76, max: 81 }])).toEqual([
-      { min: 76, max: 82 },
-      { min: 76, max: 82 },
-    ])
-    const separate = [{ min: 0, max: 400 }, { min: 0, max: 6000 }]
-    expect(shareScale(separate)).toEqual(separate)
+describe('curveRangeIn', () => {
+  it('шкала по участку, а без замеров на участке — по всем данным', () => {
+    const [c] = mergeCurves([], [curve('T', '°C', [0, 100, 200], [10, 80, 82])], 'a')
+    if (!c) throw new Error('нет кривой')
+    expect(curveRangeIn(c, { topM: 90, spanM: 200 }).min).toBeGreaterThan(70)
+    expect(curveRangeIn(c, { topM: 500, spanM: 10 }).min).toBeLessThanOrEqual(10)
   })
 })
 

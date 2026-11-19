@@ -24,6 +24,7 @@ const PATHS = {
   windows: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16M15 4v16" /></>,
   panel: <><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M15 4v16" /></>,
   comment: <path d="M4 5h16v11H9l-5 4z" />,
+  scale: <><path d="M4 7h16M4 17h16" /><path d="M7 7v3M11 7v2M15 7v3M19 7v2M7 17v-3M11 17v-2M15 17v-3M19 17v-2" /></>,
   save: <><path d="M5 3h11l3 3v15H5z" /><path d="M8 3v5h7V3M8 21v-7h8v7" /></>,
 } satisfies Record<string, ReactNode>
 

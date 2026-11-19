@@ -90,7 +90,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .column + .column { border-left: 1px solid var(--border); }
 .column--nav { width: 14px; }
 .column--depth { width: 52px; }
-.column--wellbore { width: 54px; }
+.column--wellbore { width: 64px; }
 .column__header { height: var(--header-h); flex: none; border-bottom: 1px solid var(--border); }
 .column__header--label { display: flex; align-items: flex-end; justify-content: center; padding: 6px; color: var(--muted); font-weight: 500; }
 
@@ -105,10 +105,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .navigator__thumb { position: absolute; left: 1px; right: 1px; border: 1.5px solid var(--accent); border-radius: 3px; background: rgba(29, 78, 216, 0.12); }
 
 .plot--wellbore { cursor: grab; }
-.wellbore__wall { position: absolute; top: 0; bottom: 0; width: 3px; background: #475569; }
-.wellbore__wall--left { left: 16px; }
-.wellbore__wall--right { right: 16px; }
-.wellbore__perf { position: absolute; left: 8px; right: 8px; background: repeating-linear-gradient(to bottom, #dc2626 0 1.5px, transparent 1.5px 4px); }
+.wellbore__wall { position: absolute; width: 3px; background: #475569; }
+.wellbore__shoe { position: absolute; width: 6px; height: 6px; clip-path: polygon(0 100%, 100% 0, 100% 100%); }
+.wellbore__shoe + .wellbore__shoe { clip-path: polygon(0 0, 100% 100%, 0 100%); }
+.wellbore__openhole { position: absolute; border-left: 2px dashed #94a3b8; border-right: 2px dashed #94a3b8; }
+.wellbore__perf { position: absolute; background: repeating-linear-gradient(to bottom, #dc2626 0 1.5px, transparent 1.5px 4px); }
+.wellbore__bottom { position: absolute; border-top: 2px solid #1a1d23; background: repeating-linear-gradient(45deg, #94a3b8 0 1.5px, transparent 1.5px 5px); }
 
 .track { flex: 1 1 0; min-width: 150px; }
 .track__header { padding: 4px 6px 4px 8px; display: flex; flex-direction: column; gap: 1px; overflow-y: auto; }
@@ -200,3 +202,4 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .comment__meta { display: flex; align-items: center; justify-content: space-between; font-size: 10.5px; }
 .comment__text { line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
 .menu__shortcut { margin-left: auto; color: var(--muted); font-size: 11px; }
+.card__line { margin: 0; padding: 2px 0; font-size: 11.5px; }

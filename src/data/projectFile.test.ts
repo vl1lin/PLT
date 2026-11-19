@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildDemoCurves, buildDemoProject } from './demo'
+import { buildDemoConstruction, buildDemoCurves, buildDemoProject } from './demo'
 import { parseProjectFile, ProjectFileError, serializeProject } from './projectFile'
 
 describe('файл проекта', () => {
@@ -11,11 +11,13 @@ describe('файл проекта', () => {
     values[3] = Number.NaN
     const withGap = [{ ...first, values }, ...curves.slice(1)]
     const project = buildDemoProject()
-    const text = serializeProject({ well: { name: 'Скв. 1', field: 'Тест' }, curves: withGap, project }, new Date())
+    const construction = buildDemoConstruction()
+    const text = serializeProject({ well: { name: 'Скв. 1', field: 'Тест' }, construction, curves: withGap, project }, new Date())
     expect(text).toContain('null')
     const back = parseProjectFile(text)
     expect(back.well).toEqual({ name: 'Скв. 1', field: 'Тест' })
     expect(back.project).toEqual(project)
+    expect(back.construction).toEqual(construction)
     expect(back.curves).toHaveLength(curves.length)
     expect(Number.isNaN(back.curves[0]?.values[3])).toBe(true)
     expect(back.curves[0]?.values[4]).toBe(first.values[4])
@@ -23,8 +25,15 @@ describe('файл проекта', () => {
 
   it('отбрасывает ссылки на отсутствующие кривые', () => {
     const curves = buildDemoCurves().filter((c) => c.id !== 'gk')
-    const back = parseProjectFile(serializeProject({ well: null, curves, project: buildDemoProject() }, new Date()))
+    const back = parseProjectFile(serializeProject({ well: null, construction: null, curves, project: buildDemoProject() }, new Date()))
     expect(back.project.windows[0]?.curves).toEqual([])
+  })
+
+  it('читает файл без конструкции (ранняя версия формата)', () => {
+    const text = serializeProject({ well: null, construction: null, curves: [], project: buildDemoProject() }, new Date())
+    const old = JSON.parse(text) as Record<string, unknown>
+    delete old.construction
+    expect(parseProjectFile(JSON.stringify(old)).construction).toBeNull()
   })
 
   it('понятные ошибки', () => {

@@ -4,6 +4,7 @@
  *
  * Схема: кнопки → store.updateProject(функция из domain/windows) | store.deleteWindow.
  * Меню кривой: копировать в окно / в новое окно, шкала min–max, цвет, убрать из окна.
+ * Меню «Шкалы» окна: общая шкала по текущим шкалам, общая/свои по видимому участку, вручную.
  */
 import { useState } from 'react'
 import { defaultDisplay } from '../domain/dataset'
@@ -11,9 +12,12 @@ import type { CurveDisplay, Project, TrackWindow } from '../domain/model'
 import {
   addCurveDisplay,
   addWindow,
+  autoScaleWindow,
   removeCurveDisplay,
   renameWindow,
+  setWindowScale,
   setWindowVisible,
+  unionOfScales,
   updateCurveDisplay,
 } from '../domain/windows'
 import { useAppStore } from '../state/store'
@@ -80,6 +84,7 @@ export function TrackHeader({ window: track, number }: { window: TrackWindow; nu
             )
           }
         </Menu>
+        {track.curves.length > 0 && <WindowScaleMenu track={track} />}
         <button
           type="button"
           className="btn btn--tiny"
@@ -206,6 +211,90 @@ function ScaleEditor({
           макс <input className="input mono" value={max} onChange={(e) => setMax(e.target.value)} inputMode="decimal" />
         </label>
         <input type="color" className="scale-editor__color" aria-label="Цвет кривой" value={color} onChange={(e) => setColor(e.target.value)} />
+      </div>
+      <button type="submit" className="btn btn--small-text" disabled={!valid}>
+        Применить
+      </button>
+    </form>
+  )
+}
+
+/** Меню шкал окна. */
+function WindowScaleMenu({ track }: { track: TrackWindow }) {
+  const updateProject = useAppStore((s) => s.updateProject)
+  const union = unionOfScales(track)
+
+  const autoScale = (shared: boolean): void => {
+    const { curves, project } = useAppStore.getState()
+    updateProject((p) => autoScaleWindow(p, track.id, curves, project.view, shared))
+  }
+
+  return (
+    <Menu label={<Icon name="scale" size={13} />} title="Шкалы окна" buttonClassName="btn btn--tiny" width={260}>
+      {(close) => (
+        <>
+          <div className="menu__label">Шкалы окна «{track.title}»</div>
+          <MenuItem
+            onSelect={() => {
+              if (union) updateProject((p) => setWindowScale(p, track.id, union))
+              close()
+            }}
+          >
+            Общая шкала окна
+            {union && (
+              <span className="menu__shortcut mono">
+                {union.min}–{union.max}
+              </span>
+            )}
+          </MenuItem>
+          <MenuItem onSelect={() => { autoScale(true); close() }}>Общая шкала по видимому участку</MenuItem>
+          <MenuItem onSelect={() => { autoScale(false); close() }}>Свои шкалы по видимому участку</MenuItem>
+          <RangeForm
+            title="Общая шкала вручную"
+            initial={union ?? { min: 0, max: 1 }}
+            onApply={(range) => {
+              updateProject((p) => setWindowScale(p, track.id, range))
+              close()
+            }}
+          />
+        </>
+      )}
+    </Menu>
+  )
+}
+
+/** Поля «мин / макс» с кнопкой «Применить». */
+function RangeForm({
+  title,
+  initial,
+  onApply,
+}: {
+  title: string
+  initial: { min: number; max: number }
+  onApply: (range: { min: number; max: number }) => void
+}) {
+  const [min, setMin] = useState(String(initial.min))
+  const [max, setMax] = useState(String(initial.max))
+  const lo = Number.parseFloat(min.replace(',', '.'))
+  const hi = Number.parseFloat(max.replace(',', '.'))
+  const valid = Number.isFinite(lo) && Number.isFinite(hi) && lo !== hi
+
+  return (
+    <form
+      className="scale-editor"
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (valid) onApply({ min: lo, max: hi })
+      }}
+    >
+      <div className="menu__label">{title}</div>
+      <div className="scale-editor__row">
+        <label>
+          мин <input className="input mono" value={min} onChange={(e) => setMin(e.target.value)} inputMode="decimal" />
+        </label>
+        <label>
+          макс <input className="input mono" value={max} onChange={(e) => setMax(e.target.value)} inputMode="decimal" />
+        </label>
       </div>
       <button type="submit" className="btn btn--small-text" disabled={!valid}>
         Применить

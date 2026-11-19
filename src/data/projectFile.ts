@@ -2,7 +2,7 @@
  * Файл проекта (*.plt.json): кривые + разметка планшета в одном JSON.
  *
  * Схема:
- *   сохранение: { well, curves: Curve[], project } ──serializeProject()──→ текст JSON
+ *   сохранение: { well, construction, curves: Curve[], project } ──serializeProject()──→ текст JSON
  *   открытие:   текст ──parseProjectFile()──→ zod-проверка ProjectFileSchema
  *               ──→ { well, curves: Curve[], project } (ссылки на отсутствующие кривые отброшены)
  *
@@ -11,6 +11,7 @@
 import { z } from 'zod'
 import type { Curve, Project } from '../domain/model'
 import { ProjectSchema } from '../domain/model'
+import { WellConstructionSchema, type WellConstruction } from '../domain/construction'
 
 const CurveFileSchema = z
   .object({
@@ -29,12 +30,15 @@ export const ProjectFileSchema = z.object({
   savedAt: z.string(),
   well: z.object({ name: z.string(), field: z.string() }).nullable(),
   curves: z.array(CurveFileSchema),
+  /** Конструкция скважины; в файлах ранних версий может отсутствовать. */
+  construction: WellConstructionSchema.nullable().optional(),
   project: ProjectSchema,
 })
 
 /** Содержимое файла проекта в виде, удобном для store. */
 export interface ProjectBundle {
   readonly well: { name: string; field: string } | null
+  readonly construction: WellConstruction | null
   readonly curves: Curve[]
   readonly project: Project
 }
@@ -57,6 +61,7 @@ export function serializeProject(bundle: ProjectBundle, now: Date): string {
     version: 1,
     savedAt: now.toISOString(),
     well: bundle.well,
+    construction: bundle.construction,
     curves: bundle.curves.map((c) => ({
       id: c.id,
       name: c.name,
@@ -104,5 +109,5 @@ export function parseProjectFile(text: string): ProjectBundle {
     ...file.project,
     windows: file.project.windows.map((w) => ({ ...w, curves: w.curves.filter((d) => ids.has(d.curveId)) })),
   }
-  return { well: file.well, curves, project }
+  return { well: file.well, construction: file.construction ?? null, curves, project }
 }

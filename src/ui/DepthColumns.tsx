@@ -4,11 +4,13 @@
  * Схема:
  *   Navigator  — весь интервал данных; рамка = видимый участок; протяжка/щелчок → store.setView
  *   DepthScale — подписи глубин по сетке вида; измеряет высоту → store.setPlotHeight
- *   Wellbore   — колонна и штриховка интервалов групп с showInWellbore
+ *   Wellbore   — конструкция (колонны по диаметрам, башмаки, открытый ствол, текущий забой)
+ *                и перфорация — интервалы групп с showInWellbore
  * Все три колонки поддерживают колесо и протяжку так же, как окна (usePlotNavigation),
  * кроме навигатора, у которого своя протяжка рамки.
  */
 import { useEffect, useRef } from 'react'
+import { describeString, innermostStringAt } from '../domain/construction'
 import { depthToPx, gridDepths } from '../domain/viewport'
 import { useAppStore } from '../state/store'
 import { useElementSize } from './hooks'
@@ -117,30 +119,90 @@ export function DepthScale() {
   )
 }
 
-/** Схема ствола с перфорацией. */
+/** Цвета колонн снаружи внутрь. */
+const STRING_COLORS = ['#334155', '#64748B', '#94A3B8'] as const
+
+/** Схема ствола: колонны по диаметрам, открытый ствол, текущий забой и перфорация. */
 export function Wellbore() {
   const ref = useRef<HTMLDivElement>(null)
   const size = useElementSize(ref)
   const view = useAppStore((s) => s.project.view)
   const groups = useAppStore((s) => s.project.groups)
   const intervals = useAppStore((s) => s.project.intervals)
+  const construction = useAppStore((s) => s.construction)
   usePlotNavigation(ref)
+
+  const h = size.height
+  const center = size.width / 2
+  const y = (d: number): number => depthToPx(d, view, h)
+  const visibleSpan = (top: number, base: number): { top: number; height: number } | null => {
+    const a = Math.max(0, y(top))
+    const b = Math.min(h, y(base))
+    return b <= 0 || a >= h ? null : { top: a, height: Math.max(2, b - a) }
+  }
+  const strings = construction?.strings ?? []
+  const maxD = Math.max(1, ...strings.map((s) => s.outerDiameterMm ?? s.innerDiameterMm ?? 0))
+  const half = (dMm: number | null): number => 5 + ((dMm ?? maxD) / maxD) * (center - 9)
+  // Полуширина внутреннего пространства на глубине: по самой внутренней колонне.
+  const innerHalf = (d: number): number => {
+    const s = construction ? innermostStringAt(construction, d) : undefined
+    return s ? half(s.outerDiameterMm ?? s.innerDiameterMm) - 2 : center - 8
+  }
   const shown = new Set(groups.filter((g) => g.visible && g.showInWellbore).map((g) => g.id))
+  const bottomM = construction?.currentBottomM ?? null
+  const bottomSpan = bottomM === null ? null : visibleSpan(bottomM, Infinity)
+  const bottomHalf = bottomM === null ? 0 : innerHalf(bottomM)
+  const title = construction
+    ? [...strings.map(describeString), ...construction.openHole.map((o) => `Открытый ствол, ${o.topM.toFixed(1)}–${o.baseM.toFixed(1)} м`),
+       ...(construction.currentBottomM !== null ? [`Текущий забой ${construction.currentBottomM.toFixed(1)} м`] : [])].join('\n')
+    : 'Конструкция не задана'
 
   return (
     <div className="column column--wellbore">
       <div className="column__header column__header--label">Ствол</div>
-      <div ref={ref} className="plot plot--wellbore">
-        <div className="wellbore__wall wellbore__wall--left" />
-        <div className="wellbore__wall wellbore__wall--right" />
+      <div ref={ref} className="plot plot--wellbore" title={title}>
+        {strings.length === 0 && (
+          <>
+            <div className="wellbore__wall" style={{ top: 0, height: h, left: 14 }} />
+            <div className="wellbore__wall" style={{ top: 0, height: h, right: 14 }} />
+          </>
+        )}
+        {strings.map((s, i) => {
+          const span = visibleSpan(s.topM, s.baseM)
+          if (!span) return null
+          const hw = half(s.outerDiameterMm ?? s.innerDiameterMm)
+          const color = STRING_COLORS[Math.min(i, STRING_COLORS.length - 1)]
+          const shoeY = y(s.baseM)
+          return (
+            <div key={s.code}>
+              <div className="wellbore__wall" style={{ ...span, left: center - hw - 1.5, background: color }} />
+              <div className="wellbore__wall" style={{ ...span, left: center + hw - 1.5, background: color }} />
+              {shoeY >= 0 && shoeY <= h && (
+                <>
+                  <div className="wellbore__shoe" style={{ top: shoeY - 3, left: center - hw - 5, background: color }} />
+                  <div className="wellbore__shoe" style={{ top: shoeY - 3, left: center + hw - 1, background: color }} />
+                </>
+              )}
+            </div>
+          )
+        })}
+        {construction?.openHole.map((o) => {
+          const span = visibleSpan(o.topM, o.baseM)
+          if (!span) return null
+          const hw = innerHalf(o.topM)
+          return <div key={`oh-${o.topM}`} className="wellbore__openhole" style={{ ...span, left: center - hw, width: 2 * hw }} />
+        })}
         {intervals
           .filter((iv) => shown.has(iv.groupId))
           .map((iv) => {
-            const top = Math.max(0, depthToPx(iv.topM, view, size.height))
-            const bottom = Math.min(size.height, depthToPx(iv.baseM, view, size.height))
-            if (bottom <= 0 || top >= size.height) return null
-            return <div key={iv.id} className="wellbore__perf" style={{ top, height: Math.max(2, bottom - top) }} />
+            const span = visibleSpan(iv.topM, iv.baseM)
+            if (!span) return null
+            const hw = innerHalf((iv.topM + iv.baseM) / 2) + 4
+            return <div key={iv.id} className="wellbore__perf" style={{ ...span, left: center - hw, width: 2 * hw }} />
           })}
+        {bottomSpan && (
+          <div className="wellbore__bottom" style={{ top: bottomSpan.top, height: h - bottomSpan.top, left: center - bottomHalf, width: 2 * bottomHalf }} />
+        )}
       </div>
     </div>
   )
