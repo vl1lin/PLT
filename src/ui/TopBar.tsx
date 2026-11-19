@@ -1,11 +1,13 @@
 /**
- * Верхняя строка: скважина, меню «Файл», текущий вид и масштаб.
+ * Верхняя строка: скважина, меню «Файл» (LAS, открыть/сохранить проект), текущий вид и масштаб.
  * Читает well, isDemo и project.view из store.
  */
 import { scaleDenominator } from '../domain/viewport'
 import { useAppStore } from '../state/store'
 import { pickLasFiles } from './importLas'
+import { Icon } from './icons'
 import { Menu, MenuItem } from './Menu'
+import { pickProjectFile, saveProjectFile } from './projectIO'
 
 export function TopBar() {
   const view = useAppStore((s) => s.project.view)
@@ -24,7 +26,17 @@ export function TopBar() {
       <nav className="topbar__menu" aria-label="Главное меню">
         <Menu label="Файл" buttonClassName="btn btn--ghost">
           {(close) => (
-            <MenuItem onSelect={() => { pickLasFiles(); close() }}>Открыть LAS…</MenuItem>
+            <>
+              <MenuItem onSelect={() => { pickLasFiles(); close() }}>
+                <Icon name="open" size={14} /> Открыть LAS…
+              </MenuItem>
+              <MenuItem onSelect={() => { pickProjectFile(); close() }}>
+                <Icon name="open" size={14} /> Открыть проект…
+              </MenuItem>
+              <MenuItem onSelect={() => { saveProjectFile(); close() }}>
+                <Icon name="save" size={14} /> Сохранить проект <span className="menu__shortcut">Ctrl+S</span>
+              </MenuItem>
+            </>
           )}
         </Menu>
       </nav>

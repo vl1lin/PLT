@@ -199,3 +199,4 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .comment { padding: 6px 8px; border-radius: 5px; background: var(--bg); }
 .comment__meta { display: flex; align-items: center; justify-content: space-between; font-size: 10.5px; }
 .comment__text { line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.menu__shortcut { margin-left: auto; color: var(--muted); font-size: 11px; }

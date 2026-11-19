@@ -12,6 +12,7 @@
  */
 import { create } from 'zustand'
 import type { LasParseResult } from '../data/las'
+import type { ProjectBundle } from '../data/projectFile'
 import { buildDemoCurves, buildDemoProject } from '../data/demo'
 import { depthLimits, mergeCurves, windowsForCurves } from '../domain/dataset'
 import type { Curve, Project, ViewState } from '../domain/model'
@@ -129,6 +130,8 @@ export interface AppState {
   deleteSelection: () => void
   /** Выбирает интервал и подводит к нему вид. */
   revealInterval: (intervalId: string) => void
+  /** Загружает сохранённый проект целиком (кривые + разметка). */
+  loadProject: (bundle: ProjectBundle, fileName: string) => void
 }
 
 const demoCurves = buildDemoCurves()
@@ -301,6 +304,21 @@ export const useAppStore = create<AppState>()((set, get) => {
       else if (iv.topM < view.topM || iv.baseM > view.topM + view.spanM)
         next = { topM: (iv.topM + iv.baseM) / 2 - view.spanM / 2, spanM: view.spanM }
       set({ selection: { kind: 'interval', id: intervalId }, ...(next ? withView(s, next, true) : {}) })
+    },
+    loadProject: (bundle, fileName) => {
+      const limits = depthLimits(bundle.curves)
+      set({
+        curves: new Map(bundle.curves.map((c) => [c.id, c])),
+        well: bundle.well,
+        isDemo: false,
+        limits,
+        project: { ...bundle.project, view: clampView(bundle.project.view, limits) },
+        history: [],
+        pending: null,
+        selection: null,
+        activeGroupId: bundle.project.groups[0]?.id ?? null,
+        message: { kind: 'info', text: `Открыт проект ${fileName}` },
+      })
     },
   }
 })
