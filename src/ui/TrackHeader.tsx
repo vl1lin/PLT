@@ -63,7 +63,7 @@ export function TrackHeader({ window: track, number }: { window: TrackWindow; nu
             }}
           />
         ) : (
-          <span className="track__name" title="Двойной щелчок — переименовать" onDoubleClick={() => setEditing(true)}>
+          <span className="track__name" title={`${track.title} — двойной щелчок, чтобы переименовать`} onDoubleClick={() => setEditing(true)}>
             {track.title}
           </span>
         )}

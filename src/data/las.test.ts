@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decodeLasBytes, LasError, parseHeaderLine, parseLas } from './las'
+import { decodeLasBytes, LasError, normalizeUnit, parseHeaderLine, parseLas, uniqueMnemonics } from './las'
 
 const LAS20 = `~Version Information
  VERS.                  2.0 : CWLS LOG ASCII STANDARD - VERSION 2.0
@@ -84,5 +84,30 @@ describe('decodeLasBytes', () => {
   it('читает UTF-8 с BOM', () => {
     const bytes = new TextEncoder().encode('﻿ТМ')
     expect(decodeLasBytes(bytes.buffer as ArrayBuffer)).toBe('ТМ')
+  })
+})
+
+describe('особенности реальных файлов', () => {
+  it('повторяющиеся мнемоники, заглушки, degC', () => {
+    const text = [
+      '~V', ' VERS. 1.20 : CWLS LAS - VERSION 1.20',
+      '~W', ' NULL. 9999 : Null values', ' WELL. WELL : ', ' FLD. FIELD : ',
+      '~C', ' DEPT.M : Depth', ' TFNT.degC : ', ' TFNT.degC : ', ' GR  .gAPI : ',
+      '~A', ' 100.0 80.1 9999 5', ' 100.1 80.2 81.0 6',
+    ].join('\r\n')
+    const r = parseLas(text)
+    expect(r.well.name).toBe('')
+    expect(r.well.field).toBe('')
+    expect(r.curves.map((c) => [c.name, c.unit])).toEqual([
+      ['TFNT', '°C'],
+      ['TFNT_2', '°C'],
+      ['GR', 'gAPI'],
+    ])
+    expect(Number.isNaN(r.curves[1]?.values[0])).toBe(true)
+  })
+  it('uniqueMnemonics и normalizeUnit', () => {
+    expect(uniqueMnemonics(['A', 'A', 'B', 'A', 'A_2'])).toEqual(['A', 'A_2', 'B', 'A_3', 'A_2_2'])
+    expect(normalizeUnit('degC')).toBe('°C')
+    expect(normalizeUnit('атм')).toBe('атм')
   })
 })

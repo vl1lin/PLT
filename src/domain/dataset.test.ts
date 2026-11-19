@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { depthLimits, mergeCurves, windowsForCurves, type ParsedCurve } from './dataset'
+import { dataExtent, depthLimits, initialView, mergeCurves, shareScale, windowsForCurves, type ParsedCurve } from './dataset'
 import type { Curve } from './model'
 
 const parsed = (name: string, depths: number[]): ParsedCurve => ({
@@ -19,13 +19,69 @@ describe('mergeCurves', () => {
   })
 })
 
+const curve = (name: string, unit: string, depths: number[], values: number[]): ParsedCurve => ({
+  name,
+  unit,
+  depthM: Float64Array.from(depths),
+  values: Float64Array.from(values),
+})
+const GAP = Number.NaN
+
 describe('windowsForCurves', () => {
-  it('одно окно на кривую с автошкалой', () => {
-    const curves: Curve[] = mergeCurves([], [parsed('ТМ', [3280, 3530])], 'a.las')
-    const [w] = windowsForCurves(curves)
-    expect(w?.title).toBe('ТМ')
-    expect(w?.curves[0]?.scaleMin).toBeLessThanOrEqual(32.8)
-    expect(w?.curves[0]?.scaleMax).toBeGreaterThanOrEqual(35.3)
+  it('одно окно на семейство с общей шкалой', () => {
+    const curves = mergeCurves(
+      [],
+      [
+        curve('TFNT', '°C', [1, 2, 3], [80, 81, 82]),
+        curve('DBFNT', 'kHz', [1, 2, 3], [1, 2, 3]),
+        curve('TO', '°C', [1, 2, 3], [79, 80, 81]),
+        curve('VGFNT', 'kHz', [1, 2, 3], [0.2, 0.3, 0.4]),
+        curve('TFNT_2', '°C', [1, 2, 3], [80, 80, 80]),
+      ],
+      'a.las',
+    )
+    const ws = windowsForCurves(curves)
+    expect(ws.map((w) => w.title)).toEqual(['TFNT, TO', 'DBFNT', 'VGFNT'])
+    const t = ws[0]?.curves ?? []
+    expect(t).toHaveLength(3)
+    expect(new Set(t.map((d) => `${d.scaleMin}-${d.scaleMax}`)).size).toBe(1)
+    expect(new Set(t.map((d) => d.color)).size).toBe(3)
+  })
+  it('шкала по участку focus', () => {
+    const curves = mergeCurves([], [curve('T', '°C', [0, 100, 200], [10, 80, 82])], 'a')
+    const [w] = windowsForCurves(curves, { topM: 90, spanM: 120 })
+    expect(w?.curves[0]?.scaleMin).toBeGreaterThan(70)
+  })
+})
+
+describe('shareScale', () => {
+  it('общая шкала только для сопоставимых диапазонов', () => {
+    expect(shareScale([{ min: 78, max: 82 }, { min: 76, max: 81 }])).toEqual([
+      { min: 76, max: 82 },
+      { min: 76, max: 82 },
+    ])
+    const separate = [{ min: 0, max: 400 }, { min: 0, max: 6000 }]
+    expect(shareScale(separate)).toEqual(separate)
+  })
+})
+
+describe('dataExtent и initialView', () => {
+  it('участок с замерами и вид по большинству кривых', () => {
+    const d = [0, 1000, 2000, 3000, 4000]
+    const curves = mergeCurves(
+      [],
+      [
+        curve('GR', 'gAPI', d, [1, 1, 1, 1, 1]),
+        curve('T', '°C', d, [GAP, GAP, 1, 1, GAP]),
+        curve('B', 'atm', d, [GAP, GAP, 1, 1, GAP]),
+      ],
+      'x',
+    )
+    expect(dataExtent(curves[1] as Curve)).toEqual({ topM: 2000, baseM: 3000 })
+    const v = initialView(curves)
+    expect(v?.topM).toBeGreaterThan(1900)
+    expect((v?.topM ?? 0) + (v?.spanM ?? 0)).toBeLessThan(3100)
+    expect(depthLimits(curves)).toMatchObject({ minM: 0, maxM: 4000 })
   })
 })
 

@@ -7,7 +7,8 @@
  *
  * Поддерживается: секции ~V ~W ~C ~P ~O ~A, WRAP YES/NO, значение NULL,
  * глубина в метрах или футах (переводится в метры), убывающая глубина
- * (переворачивается), десятичная запятая в данных. LAS 3.0 не поддерживается.
+ * (переворачивается), десятичная запятая в данных, повторяющиеся мнемоники (TFNT, TFNT_2, …),
+ * заглушки WELL/FIELD в ~W (считаются пустыми). LAS 3.0 не поддерживается.
  */
 import type { ParsedCurve } from '../domain/dataset'
 
@@ -41,6 +42,42 @@ interface HeaderLine {
 
 const FEET_UNITS = new Set(['F', 'FT', 'FEET', 'ФТ'])
 const FT_TO_M = 0.3048
+/** Значения-заглушки в ~W, которые пишут программы вместо пустых полей. */
+const WELL_PLACEHOLDERS = new Set(['WELL', 'FIELD', 'COMPANY', 'COUNTY', 'STATE', 'LOG DATE', 'SERVICE COMPANY', 'DATE'])
+/** Приведение распространённых обозначений единиц к привычному виду. */
+const UNIT_ALIASES: Record<string, string> = { DEGC: '°C', DEG_C: '°C', DEGF: '°F' }
+
+/**
+ * Нормализует обозначение единицы (degC → °C).
+ *
+ * @param unit - единица из файла.
+ * @returns единица для отображения.
+ */
+export function normalizeUnit(unit: string): string {
+  return UNIT_ALIASES[unit.toUpperCase()] ?? unit
+}
+
+/**
+ * Делает мнемоники уникальными внутри файла: повторы получают суффикс _2, _3, …
+ *
+ * @param names - мнемоники в порядке ~C.
+ * @returns уникальные имена той же длины.
+ */
+export function uniqueMnemonics(names: readonly string[]): string[] {
+  const used = new Set<string>()
+  const count = new Map<string, number>()
+  return names.map((name) => {
+    let k = count.get(name) ?? 0
+    let candidate = name
+    while (used.has(candidate)) {
+      k += 1
+      candidate = `${name}_${k + 1}`
+    }
+    count.set(name, k)
+    used.add(candidate)
+    return candidate
+  })
+}
 
 /**
  * Декодирует байты файла: UTF-8, а при ошибке — Windows-1251 (типично для российских LAS).
@@ -125,7 +162,8 @@ export function parseLas(text: string): LasParseResult {
     const h = well.get(key)
     if (!h) return ''
     // В LAS 1.2 текстовые значения иногда записаны в поле описания.
-    return h.value || (isV1 ? h.description : '')
+    const raw = h.value || (isV1 ? h.description : '')
+    return WELL_PLACEHOLDERS.has(raw.toUpperCase()) ? '' : raw
   }
   const nullValue = Number.parseFloat(well.get('NULL')?.value ?? '')
 
@@ -157,11 +195,12 @@ export function parseLas(text: string): LasParseResult {
   if (order.length < rows) warnings.push(`Пропущено строк без глубины: ${rows - order.length}`)
   const depthM = Float64Array.from(order, (i) => (depthRaw[i] ?? 0) * depthFactor)
 
+  const names = uniqueMnemonics(curveDefs.slice(1).map((d) => d.mnemonic))
   const curves: ParsedCurve[] = curveDefs.slice(1).map((def, k) => {
     const column = table[k + 1] ?? new Float64Array(rows)
     return {
-      name: def.mnemonic,
-      unit: def.unit,
+      name: names[k] ?? def.mnemonic,
+      unit: normalizeUnit(def.unit),
       depthM,
       values: Float64Array.from(order, (i) => column[i] ?? Number.NaN),
     }

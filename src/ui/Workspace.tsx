@@ -5,7 +5,7 @@
  *        TrackColumn → шапка (легенда кривых) + TrackPlot (canvas + слои).
  * Перетаскивание LAS-файлов на рабочую область запускает импорт.
  */
-import { useState, type DragEvent } from 'react'
+import { useState, type CSSProperties, type DragEvent } from 'react'
 import type { TrackWindow } from '../domain/model'
 import { useAppStore } from '../state/store'
 import { addWindow } from '../domain/windows'
@@ -20,6 +20,9 @@ export function Workspace() {
   const updateProject = useAppStore((s) => s.updateProject)
   const [dragOver, setDragOver] = useState(false)
   const visible = windows.filter((w) => w.visible)
+  // Высота шапок — по самому заполненному окну (2–5 строк кривых), одинаковая у всех колонок.
+  const legendRows = Math.min(5, Math.max(2, ...visible.map((w) => w.curves.length)))
+  const headerStyle = { '--header-h': `${26 + legendRows * 20}px` } as CSSProperties
 
   const onDragOver = (e: DragEvent): void => {
     if (!e.dataTransfer.types.includes('Files')) return
@@ -35,6 +38,7 @@ export function Workspace() {
   return (
     <div
       className={dragOver ? 'workspace workspace--drop' : 'workspace'}
+      style={headerStyle}
       onDragOver={onDragOver}
       onDragLeave={() => setDragOver(false)}
       onDrop={onDrop}

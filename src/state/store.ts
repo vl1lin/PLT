@@ -14,7 +14,7 @@ import { create } from 'zustand'
 import type { LasParseResult } from '../data/las'
 import type { ProjectBundle } from '../data/projectFile'
 import { buildDemoCurves, buildDemoProject } from '../data/demo'
-import { depthLimits, mergeCurves, windowsForCurves } from '../domain/dataset'
+import { depthLimits, initialView, mergeCurves, windowsForCurves } from '../domain/dataset'
 import type { Curve, Project, ViewState } from '../domain/model'
 import { clampView, panBy, spanForScale, zoomAt, type DepthLimits } from '../domain/viewport'
 import { removeWindow, restoreWindow } from '../domain/windows'
@@ -106,7 +106,7 @@ export interface AppState {
   setPlotHeight: (px: number) => void
   /** Выбирает инструмент. */
   setTool: (tool: Tool) => void
-  /** Добавляет кривые из LAS: окно на кривую; первый импорт заменяет демо. */
+  /** Добавляет кривые из LAS: окно на семейство кривых; первый импорт заменяет демо и открывает интервал исследования. */
   addLasDataset: (result: LasParseResult, fileName: string) => void
   /** Показывает сообщение (null — убрать). */
   setMessage: (message: Message | null) => void
@@ -193,9 +193,11 @@ export const useAppStore = create<AppState>()((set, get) => {
         const baseProject: Project = s.isDemo
           ? { ...buildDemoProject(), windows: [], intervals: [], comments: [], lines: [], fills: [] }
           : s.project
-        const windows = [...baseProject.windows, ...windowsForCurves(added, baseProject.windows.length)]
-        const view = s.isDemo ? { topM: limits.minM, spanM: limits.maxM - limits.minM } : baseProject.view
-        const well = s.well ?? (result.well.name || result.well.field ? { name: result.well.name, field: result.well.field } : null)
+        const firstView = initialView(added) ?? { topM: limits.minM, spanM: limits.maxM - limits.minM }
+        const windows = [...baseProject.windows, ...windowsForCurves(added, firstView)]
+        const view = s.isDemo ? firstView : baseProject.view
+        // Без названия скважины в файле — имя файла без расширения.
+        const well = s.well ?? { name: result.well.name || fileName.replace(/\.[^.]+$/, ''), field: result.well.field }
         const notes = result.warnings.length ? ` Замечания: ${result.warnings.join('; ')}` : ''
         return {
           curves: new Map(allCurves.map((c) => [c.id, c])),

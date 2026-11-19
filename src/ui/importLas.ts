@@ -10,17 +10,17 @@ import { useAppStore } from '../state/store'
 /**
  * Загружает LAS-файлы в набор данных.
  *
- * @param files - выбранные пользователем файлы; не-LAS пропускаются с сообщением.
+ * @param files - выбранные файлы; расширение не важно (Камертон выгружает LAS и в .txt),
+ *                формат проверяется по содержимому (секции ~C и ~A).
  * @returns промис, который завершается после обработки всех файлов.
  */
 export async function importLasFiles(files: Iterable<File>): Promise<void> {
   const { addLasDataset, setMessage } = useAppStore.getState()
   for (const file of files) {
-    if (!/\.las$/i.test(file.name)) {
-      setMessage({ kind: 'error', text: `${file.name}: ожидается файл .las` })
-      continue
-    }
     try {
+      setMessage({ kind: 'info', text: `${file.name}: загрузка…` })
+      // Дать браузеру отрисовать сообщение перед разбором большого файла.
+      await new Promise((resolve) => setTimeout(resolve, 0))
       const result = parseLas(decodeLasBytes(await file.arrayBuffer()))
       addLasDataset(result, file.name)
     } catch (error) {
@@ -37,7 +37,7 @@ export async function importLasFiles(files: Iterable<File>): Promise<void> {
 export function pickLasFiles(): void {
   const input = document.createElement('input')
   input.type = 'file'
-  input.accept = '.las,.LAS'
+  input.accept = '.las,.LAS,.txt,.TXT'
   input.multiple = true
   input.addEventListener('change', () => {
     if (input.files) void importLasFiles(Array.from(input.files))
