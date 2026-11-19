@@ -1,15 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { curveRuns, lowerBound } from './curvePath'
-
-describe('lowerBound', () => {
-  it('ищет первый элемент ≥ x', () => {
-    const a = [1, 2, 2, 5]
-    expect(lowerBound(a, 2)).toBe(1)
-    expect(lowerBound(a, 3)).toBe(3)
-    expect(lowerBound(a, 9)).toBe(4)
-    expect(lowerBound(a, 0)).toBe(0)
-  })
-})
+import { curveRuns } from './curvePath'
 
 describe('curveRuns', () => {
   const projection = { view: { topM: 0, spanM: 10 }, scaleMin: 0, scaleMax: 10, widthPx: 100, heightPx: 100 }

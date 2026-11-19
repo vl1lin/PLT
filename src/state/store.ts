@@ -17,6 +17,8 @@ import { depthLimits, mergeCurves, windowsForCurves } from '../domain/dataset'
 import type { Curve, Project, ViewState } from '../domain/model'
 import { clampView, panBy, spanForScale, zoomAt, type DepthLimits } from '../domain/viewport'
 import { removeWindow, restoreWindow } from '../domain/windows'
+import { addGroup, createInterval, deleteInterval, intervalAt } from '../domain/intervals'
+import { addLine, deleteFill, deleteLine, fillAt, fillBetweenAt, lineAt, type WindowPoint } from '../domain/drawings'
 
 /** Активный инструмент панели инструментов. */
 export type Tool = 'pointer' | 'zoom' | 'interval' | 'line' | 'fill'
@@ -32,6 +34,25 @@ export interface Message {
   readonly kind: 'info' | 'error'
   readonly text: string
   readonly action?: { readonly label: string; readonly run: () => void }
+}
+
+/** Выбранный объект планшета. */
+export type Selection =
+  | { readonly kind: 'interval'; readonly id: string }
+  | { readonly kind: 'line'; readonly id: string }
+  | { readonly kind: 'fill'; readonly id: string }
+
+/** Первая точка двухточечного инструмента (интервал, линия). */
+export interface PendingPoint {
+  readonly tool: 'interval' | 'line'
+  readonly windowId: string
+  readonly point: WindowPoint
+}
+
+/** Размер области построения окна в момент щелчка, px. */
+export interface PlotSizePx {
+  readonly width: number
+  readonly height: number
 }
 
 const HISTORY_LIMIT = 30
@@ -57,6 +78,14 @@ export interface AppState {
   message: Message | null
   /** Открыта ли правая панель. */
   panelOpen: boolean
+  /** Группа для новых интервалов. */
+  activeGroupId: string | null
+  /** Где создаётся новый интервал: во всех окнах или только в окне щелчка. */
+  newIntervalScope: 'all' | 'window'
+  /** Первая точка интервала или линии. */
+  pending: PendingPoint | null
+  /** Выбранный объект. */
+  selection: Selection | null
 
   /** Устанавливает вид; remember — запомнить текущий для «Предыдущий вид». */
   setView: (view: ViewState, remember?: boolean) => void
@@ -86,6 +115,20 @@ export interface AppState {
   deleteWindow: (windowId: string) => void
   /** Открывает/закрывает правую панель. */
   togglePanel: () => void
+  /** Щелчок в окне: действие зависит от инструмента. */
+  plotClick: (windowId: string, point: WindowPoint, size: PlotSizePx) => void
+  /** Выбирает объект (null — снять выбор). */
+  select: (selection: Selection | null) => void
+  /** Выбирает группу для новых интервалов. */
+  setActiveGroup: (groupId: string) => void
+  /** Задаёт область новых интервалов. */
+  setNewIntervalScope: (scope: 'all' | 'window') => void
+  /** Отменяет первую точку интервала/линии. */
+  cancelPending: () => void
+  /** Удаляет выбранный объект. */
+  deleteSelection: () => void
+  /** Выбирает интервал и подводит к нему вид. */
+  revealInterval: (intervalId: string) => void
 }
 
 const demoCurves = buildDemoCurves()
@@ -111,6 +154,10 @@ export const useAppStore = create<AppState>()((set, get) => {
     tool: 'pointer',
     message: null,
     panelOpen: true,
+    activeGroupId: 'g1',
+    newIntervalScope: 'all',
+    pending: null,
+    selection: { kind: 'interval', id: 'i1' },
 
     setView: (view, remember = false) => set((s) => withView(s, view, remember)),
     rememberView: () => set((s) => ({ history: [...s.history, s.project.view].slice(-HISTORY_LIMIT) })),
@@ -132,7 +179,7 @@ export const useAppStore = create<AppState>()((set, get) => {
         return { project: { ...s.project, view: clampView(prev, s.limits) }, history: s.history.slice(0, -1) }
       }),
     setPlotHeight: (px) => set((s) => (Math.abs(s.plotHeightPx - px) < 0.5 ? {} : { plotHeightPx: px })),
-    setTool: (tool) => set({ tool }),
+    setTool: (tool) => set({ tool, pending: null }),
 
     addLasDataset: (result, fileName) =>
       set((s) => {
@@ -154,6 +201,8 @@ export const useAppStore = create<AppState>()((set, get) => {
           limits,
           project: { ...baseProject, windows, view: clampView(view, limits) },
           history: [],
+          pending: null,
+          selection: s.isDemo ? null : s.selection,
           message: { kind: 'info', text: `${fileName}: загружено кривых — ${added.length}.${notes}` },
         }
       }),
@@ -175,5 +224,83 @@ export const useAppStore = create<AppState>()((set, get) => {
       })
     },
     togglePanel: () => set((s) => ({ panelOpen: !s.panelOpen })),
+
+    plotClick: (windowId, point, size) => {
+      const s = get()
+      const p = s.project
+      const samePending = s.pending && s.pending.windowId === windowId && s.pending.tool === s.tool ? s.pending : null
+      switch (s.tool) {
+        case 'pointer': {
+          const line = lineAt(p, windowId, point, p.view, size.width, size.height)
+          if (line) return set({ selection: { kind: 'line', id: line.id } })
+          const fill = fillAt(p, windowId, point)
+          if (fill) return set({ selection: { kind: 'fill', id: fill.id } })
+          const iv = intervalAt(p, windowId, point.depthM)
+          return set({ selection: iv ? { kind: 'interval', id: iv.id } : null })
+        }
+        case 'interval': {
+          if (!samePending) return set({ pending: { tool: 'interval', windowId, point }, message: null })
+          let project = p
+          let groupId = s.activeGroupId && p.groups.some((g) => g.id === s.activeGroupId) ? s.activeGroupId : null
+          if (!groupId) {
+            const created = addGroup(project)
+            project = created.project
+            groupId = created.groupId
+          }
+          const scope = s.newIntervalScope === 'all' ? 'all' : [windowId]
+          const { project: next, intervalId } = createInterval(project, groupId, samePending.point.depthM, point.depthM, scope)
+          return set({
+            project: next,
+            pending: null,
+            activeGroupId: groupId,
+            selection: intervalId ? { kind: 'interval', id: intervalId } : s.selection,
+          })
+        }
+        case 'line': {
+          if (!samePending) return set({ pending: { tool: 'line', windowId, point }, message: null })
+          const { project: next, lineId } = addLine(p, windowId, samePending.point, point)
+          return set({ project: next, pending: null, selection: lineId ? { kind: 'line', id: lineId } : s.selection })
+        }
+        case 'fill': {
+          const { project: next, fillId } = fillBetweenAt(p, windowId, point)
+          if (!fillId) {
+            return set({
+              message: { kind: 'error', text: 'Заливка: щёлкните между двумя линиями этого окна, которые перекрываются по глубине' },
+            })
+          }
+          return set({ project: next, selection: { kind: 'fill', id: fillId }, message: null })
+        }
+        case 'zoom':
+          return undefined
+      }
+    },
+    select: (selection) => set({ selection }),
+    setActiveGroup: (groupId) => set({ activeGroupId: groupId }),
+    setNewIntervalScope: (scope) => set({ newIntervalScope: scope }),
+    cancelPending: () => set({ pending: null }),
+    deleteSelection: () =>
+      set((s) => {
+        const sel = s.selection
+        if (!sel) return {}
+        const project =
+          sel.kind === 'interval'
+            ? deleteInterval(s.project, sel.id)
+            : sel.kind === 'line'
+              ? deleteLine(s.project, sel.id)
+              : deleteFill(s.project, sel.id)
+        return { project, selection: null }
+      }),
+    revealInterval: (intervalId) => {
+      const s = get()
+      const iv = s.project.intervals.find((i) => i.id === intervalId)
+      if (!iv) return
+      const { view } = s.project
+      const len = iv.baseM - iv.topM
+      let next: ViewState | null = null
+      if (len > view.spanM * 0.8) next = { topM: iv.topM - len * 0.15, spanM: len * 1.3 }
+      else if (iv.topM < view.topM || iv.baseM > view.topM + view.spanM)
+        next = { topM: (iv.topM + iv.baseM) / 2 - view.spanM / 2, spanM: view.spanM }
+      set({ selection: { kind: 'interval', id: intervalId }, ...(next ? withView(s, next, true) : {}) })
+    },
   }
 })

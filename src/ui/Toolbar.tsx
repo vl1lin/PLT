@@ -4,7 +4,7 @@
  * Схема: кнопки → store: setTool (инструменты), zoom/setScale/fitAll/goBack (масштаб);
  *        «Открыть LAS» → pickLasFiles() → импорт.
  * «Окна» → меню видимости, порядка и удаления окон; «+ Окно» → пустое окно.
- * Группы и область новых интервалов добавляются этапом 3.
+ * Группа новых интервалов (меню) и область «Во всех окнах / В одном окне» → store.
  */
 import { useAppStore, type Tool } from '../state/store'
 import { Icon, type IconName } from './icons'
@@ -12,6 +12,7 @@ import { pickLasFiles } from './importLas'
 import { Menu, MenuItem } from './Menu'
 import { scaleDenominator } from '../domain/viewport'
 import { addWindow, moveWindow, setWindowVisible } from '../domain/windows'
+import { addGroup } from '../domain/intervals'
 
 const TOOLS: ReadonlyArray<{ id: Tool; label: string; icon: IconName; title: string }> = [
   { id: 'pointer', label: 'Указатель', icon: 'pointer', title: 'Выбор и перемещение протяжкой' },
@@ -37,13 +38,15 @@ export function Toolbar() {
   const updateProject = useAppStore((s) => s.updateProject)
   const panelOpen = useAppStore((s) => s.panelOpen)
   const togglePanel = useAppStore((s) => s.togglePanel)
+  const scope = useAppStore((s) => s.newIntervalScope)
+  const setScope = useAppStore((s) => s.setNewIntervalScope)
   const centerM = view.topM + view.spanM / 2
 
   return (
     <div className="toolbar" role="toolbar" aria-label="Инструменты">
-      <button type="button" className="btn" onClick={pickLasFiles} title="Загрузить один или несколько LAS-файлов">
+      <button type="button" className="btn" onClick={pickLasFiles} title="Открыть LAS-файлы (можно несколько; также можно перетащить файлы на планшет)">
         <Icon name="open" />
-        Открыть LAS
+        LAS
       </button>
       <span className="toolbar__sep" />
 
@@ -61,6 +64,17 @@ export function Toolbar() {
             {t.label}
           </button>
         ))}
+      </div>
+      <span className="toolbar__sep" />
+
+      <GroupMenu />
+      <div className="segmented" role="group" aria-label="Где создаётся новый интервал" title="Новый интервал: во всех окнах или только в окне, где щёлкнули">
+        <button type="button" className={scope === 'all' ? 'segmented__item segmented__item--on' : 'segmented__item'} aria-pressed={scope === 'all'} onClick={() => setScope('all')}>
+          Все окна
+        </button>
+        <button type="button" className={scope === 'window' ? 'segmented__item segmented__item--on' : 'segmented__item'} aria-pressed={scope === 'window'} onClick={() => setScope('window')}>
+          Одно окно
+        </button>
       </div>
       <span className="toolbar__sep" />
 
@@ -84,7 +98,7 @@ export function Toolbar() {
           <Icon name="plus" />
         </button>
       </div>
-      <button type="button" className="btn" onClick={fitAll} title="Показать весь интервал">
+      <button type="button" className="btn" onClick={fitAll} title="Показать весь интервал данных">
         Весь
       </button>
       <button type="button" className="btn btn--icon" aria-label="Предыдущий вид" title="Предыдущий вид" disabled={!canGoBack} onClick={goBack}>
@@ -101,13 +115,13 @@ export function Toolbar() {
       <span className="toolbar__spacer" />
       <button
         type="button"
-        className={panelOpen ? 'btn btn--toggled' : 'btn'}
+        className={panelOpen ? 'btn btn--icon btn--toggled' : 'btn btn--icon'}
         aria-pressed={panelOpen}
+        aria-label="Панель интервалов и сводки"
         title="Панель интервалов и сводки"
         onClick={togglePanel}
       >
         <Icon name="panel" />
-        Панель
       </button>
     </div>
   )
@@ -182,6 +196,55 @@ function WindowsMenu() {
               Показать все
             </button>
           </div>
+        </>
+      )}
+    </Menu>
+  )
+}
+
+/** Выбор группы для новых интервалов. */
+function GroupMenu() {
+  const groups = useAppStore((s) => s.project.groups)
+  const activeId = useAppStore((s) => s.activeGroupId)
+  const setActiveGroup = useAppStore((s) => s.setActiveGroup)
+  const updateProject = useAppStore((s) => s.updateProject)
+  const active = groups.find((g) => g.id === activeId)
+
+  return (
+    <Menu
+      title="Группа для новых интервалов"
+      width={240}
+      label={
+        <>
+          <span className="dot" style={{ background: active?.color ?? '#C9CED6' }} />
+          <span className="toolbar__group-name">{active?.name ?? 'Группа не выбрана'}</span>
+          <Icon name="chevronDown" size={12} />
+        </>
+      }
+    >
+      {(close) => (
+        <>
+          <div className="menu__label">Группа для новых интервалов</div>
+          {groups.map((g) => (
+            <MenuItem key={g.id} onSelect={() => { setActiveGroup(g.id); close() }}>
+              <span className="dot" style={{ background: g.color }} />
+              <span className={g.id === activeId ? 'menu__item-strong' : undefined}>{g.name}</span>
+            </MenuItem>
+          ))}
+          <MenuItem
+            onSelect={() => {
+              let created = ''
+              updateProject((p) => {
+                const r = addGroup(p)
+                created = r.groupId
+                return r.project
+              })
+              setActiveGroup(created)
+              close()
+            }}
+          >
+            <Icon name="plus" size={13} /> Новая группа
+          </MenuItem>
         </>
       )}
     </Menu>

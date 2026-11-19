@@ -19,7 +19,7 @@
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 12px/1.4 var(--font); }
-button, input, select { font: inherit; color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
 .mono { font-family: var(--mono); }
 .muted { color: var(--muted); }
 .icon { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
@@ -137,3 +137,65 @@ button, input, select { font: inherit; color: inherit; }
   .app__body { flex-direction: column; }
   .panel { flex: none; padding: 0 6px 6px; }
 }
+
+/* Слои поверх кривых */
+.layer-interval { position: absolute; left: 0; right: 0; pointer-events: none; }
+.layer-drawings { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.layer-pending { position: absolute; left: 0; right: 0; border-top: 2px dashed var(--accent); pointer-events: none; }
+.layer-pending__label { position: absolute; left: 4px; top: 3px; padding: 1px 6px; border-radius: 4px; background: var(--accent); color: #fff; font-size: 10.5px; }
+.layer-pending__dot { position: absolute; top: -5px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--accent); }
+
+/* Панель инструментов: группа и область */
+.toolbar__group-name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.segmented { display: flex; border: 1px solid var(--border-strong); border-radius: 6px; overflow: hidden; }
+.segmented__item { height: 28px; padding: 0 9px; border: none; background: var(--surface); font-weight: 500; cursor: pointer; }
+.segmented__item + .segmented__item { border-left: 1px solid var(--border-strong); }
+.segmented__item--on { background: var(--accent-soft); color: var(--accent); }
+.menu__item-strong { font-weight: 600; }
+
+/* Панель: карточки */
+.card { display: flex; flex-direction: column; gap: 2px; }
+.card__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.card__head .card__title { margin: 0; }
+.card__note { margin: 2px 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.card__scroll { max-height: 190px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+.card__actions { display: flex; gap: 6px; margin-top: 6px; }
+.card--summary { gap: 8px; }
+.row { border-radius: 5px; }
+.row--active { background: var(--accent-soft); }
+.row__button { border: none; background: transparent; text-align: left; cursor: pointer; padding: 0; min-height: 26px; display: flex; align-items: center; gap: 6px; }
+.row.row__button { padding: 0 6px; width: 100%; }
+.row.row__button:hover:not(.row--active) { background: var(--bg); }
+.row__small { font-size: 10.5px; }
+.row__count { display: flex; align-items: center; gap: 2px; }
+.row__color { flex: 0 0 18px; width: 18px; height: 18px; padding: 0; border: none; border-radius: 4px; background: none; cursor: pointer; }
+.row__color::-webkit-color-swatch-wrapper { padding: 0; }
+.row__color::-webkit-color-swatch { border: none; border-radius: 3px; }
+.dot--small { flex-basis: 8px; height: 8px; border-radius: 2px; }
+.btn--on { color: var(--accent); background: var(--accent-soft); }
+.btn--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn--primary:hover { background: #1e40af; }
+.btn--primary:disabled { background: #a9bdf0; border-color: #a9bdf0; color: #fff; }
+.btn--danger-outline { align-self: flex-start; height: 26px; color: var(--danger); font-size: 11.5px; }
+.check { display: flex; align-items: center; gap: 6px; }
+
+.summary__fields { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 6px; }
+.summary__field { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 10.5px; color: var(--muted); }
+.summary__field .input { width: 100%; min-width: 0; color: var(--text); font-size: 12px; }
+.summary__meta { font-size: 11px; }
+.summary__table { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); border: 1px solid var(--border); border-radius: 5px; overflow: hidden; font-size: 11px; }
+.summary__th { padding: 4px 6px; background: var(--bg); color: var(--muted); font-weight: 500; }
+.summary__th .mono { color: var(--text); }
+.summary__row { display: contents; }
+.summary__row > div { padding: 4px 6px; border-top: 1px solid var(--grid); }
+.summary__name { display: flex; align-items: center; gap: 5px; min-width: 0; }
+
+.comments { display: flex; flex-direction: column; gap: 5px; padding-top: 6px; border-top: 1px solid var(--grid); }
+.comments__title { font-weight: 600; font-size: 11.5px; }
+.comments__label { font-size: 10.5px; }
+.comments__form { display: flex; flex-direction: column; gap: 4px; }
+.comments__form .btn { align-self: flex-end; height: 26px; }
+.comments__input { height: auto; padding: 5px 8px; resize: vertical; line-height: 1.4; }
+.comment { padding: 6px 8px; border-radius: 5px; background: var(--bg); }
+.comment__meta { display: flex; align-items: center; justify-content: space-between; font-size: 10.5px; }
+.comment__text { line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }

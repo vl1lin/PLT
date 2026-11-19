@@ -8,24 +8,7 @@
  * для каждой строки берутся минимум и максимум x (форма кривой сохраняется).
  */
 import type { ViewState } from '../domain/model'
-
-/**
- * Индекс первого элемента ≥ x в возрастающем массиве.
- *
- * @param arr - массив, отсортированный по возрастанию.
- * @param x - искомое значение.
- * @returns индекс в [0, arr.length].
- */
-export function lowerBound(arr: ArrayLike<number>, x: number): number {
-  let lo = 0
-  let hi = arr.length
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1
-    if ((arr[mid] ?? Infinity) < x) lo = mid + 1
-    else hi = mid
-  }
-  return lo
-}
+import { lowerBound } from '../domain/sampling'
 
 /** Параметры пересчёта кривой в пиксели. */
 export interface CurveProjection {

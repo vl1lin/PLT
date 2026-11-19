@@ -2,24 +2,24 @@
  * Область построения одного окна: canvas с кривыми и слой взаимодействия поверх.
  *
  * Схема: store (view, curves) + размер элемента → curveRuns() → drawTrack() на canvas;
- *        мышь → usePlotNavigation() → действия store; children — слои поверх (интервалы и т. п.).
+ *        слои: IntervalLayer (под кривыми) | canvas | DrawingLayer, PendingLayer (поверх);
+ *        мышь → usePlotNavigation() → навигация или store.plotClick (инструменты, выбор).
  */
-import { useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { TrackWindow } from '../domain/model'
 import { depthToPx, gridDepths } from '../domain/viewport'
 import { curveRuns } from '../render/curvePath'
 import { drawTrack } from '../render/drawTrack'
 import { useAppStore } from '../state/store'
 import { useDevicePixelRatio, useElementSize } from './hooks'
+import { DrawingLayer, IntervalLayer, PendingLayer } from './PlotLayers'
 import { usePlotNavigation, type PlotClick } from './usePlotNavigation'
 
 interface TrackPlotProps {
   readonly window: TrackWindow
-  readonly onClick?: (click: PlotClick) => void
-  readonly children?: ReactNode
 }
 
-export function TrackPlot({ window: track, onClick, children }: TrackPlotProps) {
+export function TrackPlot({ window: track }: TrackPlotProps) {
   const ref = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const size = useElementSize(ref)
@@ -27,7 +27,12 @@ export function TrackPlot({ window: track, onClick, children }: TrackPlotProps) 
   const view = useAppStore((s) => s.project.view)
   const curves = useAppStore((s) => s.curves)
   const tool = useAppStore((s) => s.tool)
-  const { zoomBox, panning } = usePlotNavigation(ref, onClick ? { onClick } : {})
+  const plotClick = useAppStore((s) => s.plotClick)
+  const onClick = useCallback(
+    (c: PlotClick) => plotClick(track.id, { depthM: c.depthM, xFrac: c.xFrac }, { width: c.widthPx, height: c.heightPx }),
+    [plotClick, track.id],
+  )
+  const { zoomBox, panning } = usePlotNavigation(ref, { onClick })
 
   const layers = useMemo(
     () =>
@@ -67,8 +72,10 @@ export function TrackPlot({ window: track, onClick, children }: TrackPlotProps) 
 
   return (
     <div ref={ref} className="plot" style={{ cursor }}>
+      <IntervalLayer windowId={track.id} heightPx={size.height} />
       <canvas ref={canvasRef} className="plot__canvas" aria-hidden="true" />
-      {children}
+      <DrawingLayer windowId={track.id} />
+      <PendingLayer windowId={track.id} heightPx={size.height} />
       {zoomBox && <div className="plot__zoombox" style={{ top: zoomBox.topPx, height: zoomBox.heightPx }} />}
     </div>
   )

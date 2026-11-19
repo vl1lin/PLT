@@ -27,6 +27,9 @@ export interface PlotClick {
   readonly depthM: number
   /** Положение по горизонтали, доля ширины 0..1. */
   readonly xFrac: number
+  /** Размер области построения, px. */
+  readonly widthPx: number
+  readonly heightPx: number
 }
 
 export interface PlotNavigationOptions {
@@ -127,6 +130,8 @@ export function usePlotNavigation(
           optionsRef.current.onClick?.({
             depthM: pxToDepth(e.clientY - r.top, startView, r.height),
             xFrac: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+            widthPx: r.width,
+            heightPx: r.height,
           })
         }
       }
