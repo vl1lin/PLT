@@ -111,3 +111,21 @@ describe('особенности реальных файлов', () => {
     expect(normalizeUnit('атм')).toBe('атм')
   })
 })
+
+describe('устойчивость к нестандартным файлам', () => {
+  it('строки заголовка без двоеточия', () => {
+    const r = parseLas('~V\nVERS. 2.0\n~W\nNULL. -999\n~C\nDEPT.M\nGR.API\n~A\n1 2\n2 -999\n')
+    expect(r.curves.map((c) => [c.name, c.unit])).toEqual([['GR', 'API']])
+    expect(Number.isNaN(r.curves[0]?.values[1])).toBe(true)
+    expect(parseHeaderLine('DEPT.M')).toEqual({ mnemonic: 'DEPT', unit: 'M', value: '', description: '' })
+  })
+  it('текст в данных — пропуск, а не часть числа', () => {
+    const r = parseLas('~C\nDEPT.M :\nDATE. :\nGR.API :\n~A\n1 12.11.2026 2\n2 13.11.2026 1e1\n')
+    expect(Array.from(r.curves[0]?.values ?? []).every(Number.isNaN)).toBe(true)
+    expect(Array.from(r.curves[1]?.values ?? [])).toEqual([2, 10])
+  })
+  it('пропуск -999.25 без строки NULL', () => {
+    const r = parseLas('~C\nDEPT.M :\nGR.API :\n~A\n1 -999.25\n2 -9999\n3 4\n')
+    expect(Array.from(r.curves[0]?.values ?? []).map((v) => (Number.isNaN(v) ? null : v))).toEqual([null, null, 4])
+  })
+})

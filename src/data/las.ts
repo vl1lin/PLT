@@ -8,6 +8,7 @@
  * Поддерживается: секции ~V ~W ~C ~P ~O ~A, WRAP YES/NO, значение NULL,
  * глубина в метрах или футах (переводится в метры), убывающая глубина
  * (переворачивается), десятичная запятая в данных, повторяющиеся мнемоники (TFNT, TFNT_2, …),
+ * строки заголовка без двоеточия, текст в данных (→ пропуск), пропуски -999.25 без строки NULL,
  * заглушки WELL/FIELD в ~W (считаются пустыми). LAS 3.0 не поддерживается.
  */
 import type { ParsedCurve } from '../domain/dataset'
@@ -51,6 +52,8 @@ interface HeaderLine {
 }
 
 const FEET_UNITS = new Set(['F', 'FT', 'FEET', 'ФТ'])
+/** Значения-пропуски, если в ~W нет строки NULL. */
+const DEFAULT_NULLS = [-999.25, -9999, -99999]
 const FT_TO_M = 0.3048
 /** Значения-заглушки в ~W, которые пишут программы вместо пустых полей. */
 const WELL_PLACEHOLDERS = new Set(['WELL', 'FIELD', 'COMPANY', 'COUNTY', 'STATE', 'LOG DATE', 'SERVICE COMPANY', 'DATE'])
@@ -106,15 +109,17 @@ export function decodeLasBytes(buffer: ArrayBuffer): string {
 }
 
 /**
- * Разбирает строку заголовка вида `MNEM.UNIT  VALUE : DESCRIPTION`.
+ * Разбирает строку заголовка вида `MNEM.UNIT  VALUE : DESCRIPTION` (двоеточие может отсутствовать).
  *
  * @param line - строка секции ~V/~W/~C/~P.
  * @returns части строки или null, если строка не по формату.
  */
 export function parseHeaderLine(line: string): HeaderLine | null {
   const dot = line.indexOf('.')
-  const colon = line.lastIndexOf(':')
-  if (dot <= 0 || colon < dot) return null
+  // Двоеточие обязательно по стандарту, но некоторые программы его не пишут.
+  const lastColon = line.lastIndexOf(':')
+  const colon = lastColon > dot ? lastColon : line.length
+  if (dot <= 0) return null
   const mnemonic = line.slice(0, dot).trim()
   if (!mnemonic) return null
   const rest = line.slice(dot + 1, colon)
@@ -124,7 +129,7 @@ export function parseHeaderLine(line: string): HeaderLine | null {
     mnemonic,
     unit,
     value: rest.slice(unit.length).trim(),
-    description: line.slice(colon + 1).trim(),
+    description: colon < line.length ? line.slice(colon + 1).trim() : '',
   }
 }
 
@@ -177,7 +182,9 @@ export function parseLas(text: string): LasParseResult {
     const raw = h.value || (isV1 ? h.description : '')
     return WELL_PLACEHOLDERS.has(raw.toUpperCase()) ? '' : raw
   }
-  const nullValue = Number.parseFloat(well.get('NULL')?.value ?? '')
+  // Если NULL не объявлен, пропусками считаются распространённые значения по умолчанию.
+  const declaredNull = Number.parseFloat(well.get('NULL')?.value ?? '')
+  const nullValues = Number.isFinite(declaredNull) ? [declaredNull] : DEFAULT_NULLS
 
   const columns = curveDefs.length
   const rows = Math.floor(dataTokens.length / columns)
@@ -188,8 +195,9 @@ export function parseLas(text: string): LasParseResult {
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < columns; c++) {
       const token = dataTokens[r * columns + c] ?? ''
-      let v = Number.parseFloat(token.includes(',') && !token.includes('.') ? token.replace(',', '.') : token)
-      if (!Number.isFinite(v) || (Number.isFinite(nullValue) && Math.abs(v - nullValue) < 1e-9)) v = Number.NaN
+      // Number() строже parseFloat: «12.11.2026» и прочий текст дают NaN, а не часть числа.
+      let v = Number(token.includes(',') && !token.includes('.') ? token.replace(',', '.') : token)
+      if (!Number.isFinite(v) || nullValues.some((n) => Math.abs(v - n) < 1e-9)) v = Number.NaN
       const column = table[c]
       if (column) column[r] = v
     }
